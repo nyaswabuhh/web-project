@@ -8,9 +8,9 @@ from datetime import datetime
 app=Flask(__name__)
 app.secret_key = 'ferfe sdsewgew'
 
-cur.execute("CREATE TABLE IF NOT EXISTS products(id SERIAL PRIMARY KEY, prduct_name VARCHAR(100), buying_price NUMERIC(14,2),selling_price NUMERIC(14,2), stock_quantity INTEGER)")
+cur.execute("CREATE TABLE IF NOT EXISTS products(id SERIAL PRIMARY KEY, prduct_name VARCHAR(100), buying_price NUMERIC(14,2),selling_price NUMERIC(14,2), stock_quantity INTEGER);")
 
-cur.execute("CREATE TABLE IF NOT EXISTS sales (id SERIAL PRIMARY KEY, pid INT, quantity NUMERIC(5,2), created_at TIMESTAMP, CONSTRAINT fk_product FOREIGN KEY (pid) REFERENCES products(id) ON UPDATE CASCADE ON DELETE RESTRICT)")
+cur.execute ("CREATE TABLE IF NOT EXISTS sales (id SERIAL PRIMARY KEY, pid INTEGER REFERENCES products(id), quantity INTEGER NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);")
 
 conn.commit()
 
