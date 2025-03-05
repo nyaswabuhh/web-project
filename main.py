@@ -1,18 +1,27 @@
-from flask import Flask, render_template, request, redirect,flash
-
+from flask import Flask, render_template, request, redirect,flash, session, url_for
+from functools import wraps
 from database import conn, cur 
-
 from datetime import datetime
-
+from flask_bcrypt import Bcrypt
 
 app=Flask(__name__)
+bcrypt = Bcrypt(app)
+
 app.secret_key = 'ferfe sdsewgew'
 
-cur.execute("CREATE TABLE IF NOT EXISTS products(id SERIAL PRIMARY KEY, prduct_name VARCHAR(100), buying_price NUMERIC(14,2),selling_price NUMERIC(14,2), stock_quantity INTEGER);")
+def login_required(f):
+    @wraps(f)
+    def protected():
+        if 'email' not in session:
+            return redirect(url_for("login"))
+        return f()
+    return protected
 
-cur.execute ("CREATE TABLE IF NOT EXISTS sales (id SERIAL PRIMARY KEY, pid INTEGER REFERENCES products(id), quantity INTEGER NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);")
+# cur.execute("CREATE TABLE IF NOT EXISTS products(id SERIAL PRIMARY KEY, prduct_name VARCHAR(100), buying_price NUMERIC(14,2),selling_price NUMERIC(14,2), stock_quantity INTEGER);")
 
-conn.commit()
+# cur.execute ("CREATE TABLE IF NOT EXISTS sales (id SERIAL PRIMARY KEY, pid INTEGER REFERENCES products(id), quantity INTEGER NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);")
+
+# conn.commit()
 
 @app.route("/")
 
@@ -80,6 +89,7 @@ def sales():
         # return redirect("/sales")
 
 @app.route("/dashboard")
+@login_required
 def dashboard():
     query_sales_per_product = "SELECT products.name as product_name, SUM(sales.quantity*products.selling_price) as total_sales FROM sales JOIN products on products.id=sales.pid GROUP BY products.name"
     query_profit_per_product = "SELECT products.name as product_name, SUM(sales.quantity*(products.selling_price - products.buying_price )) as total_profit FROM sales JOIN products on products.id=sales.pid GROUP BY products.name"
@@ -124,8 +134,12 @@ def register():
         email = request.form["email"]
         password = request.form["password"]
 
+        hash_password=bcrypt.generate_password_hash(password).decode('utf-8')
+
         new_user_query ="INSERT INTO users(full_name,email,password)"\
-                        "VALUES('{}', '{}', '{}')".format(fullName,email, password)
+                        "VALUES('{}', '{}', '{}')".format(fullName,email, hash_password)
+        
+        print(f'{hash_password} is the hashed password')
         
         cur.execute(new_user_query)
         conn.commit()
@@ -143,19 +157,22 @@ def login():
         query_login = "SELECT user_id FROM users WHERE email='{}' and password='{}'".format(email,password)
         cur.execute(query_login)
         user=cur.fetchone()
-        # if user is None:
-        #     return render_template('/login.html')      
-        # else:
-        #     print('Log in success')
-        #     return redirect('/dashboard')  
-        if user:
-            flash ('Log in success')
-            return redirect('/dashboard')
-        else:
+        if user is None:
             flash ('Invalid credentials')
-            return render_template('/login.html')
-    else:
+            return render_template('/login.html')      
+        else:
+            session["email"] = email
+            print('Log in success')
+            return redirect('/dashboard')  
+        # if user:
+        #     session["email"] = email
+        #     flash ('Log in success')
+        #     return redirect('/dashboard')
+        # else:
+        #     flash ('Invalid credentials')
+        #     return render_template('/login.html')
+    else:     
      return render_template('/login.html')
 
-
-app.run(debug=True)
+if __name__ == '__main__':        
+    app.run(debug=True)
