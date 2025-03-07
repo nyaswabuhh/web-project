@@ -58,7 +58,25 @@ def products():
                  " VALUES ('{}',{},{},{})".format(name,buying_price,selling_price,stock_quantity)
         cur.execute(query)
         conn.commit() 
-        return redirect("/products")      
+        return redirect("/products") 
+
+@app.route("/expenses", methods=["GET", "POST"])
+def expenses():
+    if request.method=="GET":
+        cur.execute("SELECT * FROM PURCHASES ORDER BY purchase_date DESC")
+        expenses=cur.fetchall()
+        return render_template("expenses.html", expenses=expenses)
+    else:
+        expense_category = request.form["expense_category"] 
+        description = request.form["description"]
+        amount = int(request.form["amount"]) 
+
+        query_create_expense="INSERT INTO purchases(expense_category, description, amount, purchase_date)"\
+                        "VALUES('{}','{}',{}, now())".format(expense_category,description,amount)
+        cur.execute(query_create_expense)
+        conn.commit()
+        return redirect("/expenses")
+
    
 
 @app.route("/sales", methods=["GET","POST"])
@@ -91,12 +109,30 @@ def sales():
 @app.route("/dashboard")
 @login_required
 def dashboard():
-    query_sales_per_product = "SELECT products.name as product_name, SUM(sales.quantity*products.selling_price) as total_sales FROM sales JOIN products on products.id=sales.pid GROUP BY products.name"
-    query_profit_per_product = "SELECT products.name as product_name, SUM(sales.quantity*(products.selling_price - products.buying_price )) as total_profit FROM sales JOIN products on products.id=sales.pid GROUP BY products.name"
+    # query_sales_per_product = "SELECT products.name as product_name, SUM(sales.quantity*products.selling_price) as total_sales FROM sales JOIN products on products.id=sales.pid GROUP BY products.name"
+    today_query_sales_per_product = "SELECT products.name as product_name, SUM(sales.quantity*products.selling_price) as total_sales FROM sales JOIN products on products.id=sales.pid WHERE cast(created_at as DATE) = CURRENT_DATE GROUP BY products.name"
+    # query_profit_per_product = "SELECT products.name as product_name, SUM(sales.quantity*(products.selling_price - products.buying_price )) as total_profit FROM sales JOIN products on products.id=sales.pid GROUP BY products.name"
+    today_query_profit_per_product = "SELECT products.name as product_name, SUM(sales.quantity*(products.selling_price - products.buying_price )) as total_profit FROM sales JOIN products on products.id=sales.pid WHERE cast(created_at as DATE) = CURRENT_DATE GROUP BY products.name"
+    query_today_profit= "SELECT SUM(sales.quantity*(products.selling_price - products.buying_price )) as total_profit FROM sales JOIN products on products.id=sales.pid WHERE cast(created_at as DATE) = CURRENT_DATE"
+    query_today_expenses="select sum(amount) from purchases where  cast(purchase_date as DATE) = CURRENT_DATE"
 
-    cur.execute(query_profit_per_product)
+    cur.execute(query_today_profit)
+    todayprofit = cur.fetchone()
+    tprofit=int(todayprofit[0])     
+
+
+    cur.execute(query_today_expenses)
+    todayexpenses= cur.fetchone()
+    texpenses=int(todayexpenses[0])
+
+    todaynetprofit = tprofit - texpenses
+    
+
+    # cur.execute(query_profit_per_product)
+    cur.execute(today_query_profit_per_product)
     profit = cur.fetchall()
-    cur.execute(query_sales_per_product)
+    # cur.execute(query_sales_per_product)
+    cur.execute(today_query_sales_per_product)
     sales =cur.fetchall()
     x = []
     y = []
@@ -108,7 +144,7 @@ def dashboard():
     for i in profit:
         a.append(i[0])
         b.append(float(i[1]))
-    return render_template("dashboard.html", x=x, y=y, a=a, b=b)  
+    return render_template("dashboard.html", x=x, y=y, a=a, b=b, tprofit=tprofit, texpenses=texpenses, todaynetprofit=todaynetprofit)  
 
 @app.route("/update-products", methods=["POST"])
 def update_products():
