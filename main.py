@@ -184,7 +184,7 @@ def register():
         cur.execute(new_user_query)
         conn.commit()
 
-        return redirect('/register')
+        return redirect('/login')
     else:
         return render_template('/register.html') 
 
@@ -194,21 +194,51 @@ def login():
         email = request.form['email']
         password = request.form['password']
 
+        query_email_exists = "SELECT user_id FROM users WHERE email='{}'".format(email)
+        cur.execute(query_email_exists)
+        user = cur.fetchone()
+
+        print(f'{user} is the user')
+
+        hashed_pass_query = "SELECT password FROM users WHERE email='{}'".format(email)
+        cur.execute(hashed_pass_query)  
+        hashed_pass = cur.fetchone()[0]
+
+        print(f'{hashed_pass} is the OLD hashed password')
+
+        is_valid = bcrypt.check_password_hash(hashed_pass, password)
+
+        print(f'{is_valid} Boolean')
+
+        if user is None:
+            flash ('Email does not exist')
+            return render_template('/login.html')
+        else:
+            if is_valid:                
+                session["email"] = email
+                flash ('Log in success')
+                return redirect('/dashboard')
+            else:
+                flash ('Invalid credentials')
+                return render_template('/login.html')
+
+
+
         # hash_password=bcrypt.generate_password_hash(password).decode('utf-8')
         # is_valid = bcrypt.check_password_hash 
         #                     (hashed_password, password)
 
-        query_login = "SELECT user_id FROM users WHERE email='{}' and password='{}'".format(email,password)
+        # query_login = "SELECT user_id FROM users WHERE email='{}' and password='{}'".format(email,password)
         # print(f'{hash_password} is the new hashed password')
-        cur.execute(query_login)
-        user=cur.fetchone()
-        if user is None:
-            flash ('Invalid credentials')
-            return render_template('/login.html')      
-        else:
-            session["email"] = email
-            print('Log in success')
-            return redirect('/dashboard')  
+        # cur.execute(query_login)
+        # user=cur.fetchone()
+        # if user is None:
+        #     flash ('Invalid credentials')
+        #     return render_template('/login.html')      
+        # else:
+        #     session["email"] = email
+        #     print('Log in success')
+        #     return redirect('/dashboard')  
         # if user:
         #     session["email"] = email
         #     flash ('Log in success')
