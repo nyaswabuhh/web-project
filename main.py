@@ -7,7 +7,13 @@ from flask_bcrypt import Bcrypt
 app=Flask(__name__)
 bcrypt = Bcrypt(app)
 
-app.secret_key = 'ferfe sdsewgew'
+app.secret_key = 'ferfe565sdsewgew'
+
+# cur.execute("CREATE TABLE IF NOT EXISTS products(id SERIAL PRIMARY KEY, prduct_name VARCHAR(100), buying_price NUMERIC(14,2),selling_price NUMERIC(14,2), stock_quantity INTEGER);")
+
+# cur.execute ("CREATE TABLE IF NOT EXISTS sales (id SERIAL PRIMARY KEY, pid INTEGER REFERENCES products(id), quantity INTEGER NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);")
+
+# conn.commit()
 
 def login_required(f):
     @wraps(f)
@@ -17,19 +23,13 @@ def login_required(f):
         return f()
     return protected
 
-# cur.execute("CREATE TABLE IF NOT EXISTS products(id SERIAL PRIMARY KEY, prduct_name VARCHAR(100), buying_price NUMERIC(14,2),selling_price NUMERIC(14,2), stock_quantity INTEGER);")
 
-# cur.execute ("CREATE TABLE IF NOT EXISTS sales (id SERIAL PRIMARY KEY, pid INTEGER REFERENCES products(id), quantity INTEGER NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);")
-
-# conn.commit()
 
 @app.route("/")
-
 def index():
     return render_template("index.html")
 
 @app.route("/about")
-
 def about():
     return render_template("about.html")
 
@@ -42,6 +42,7 @@ def test():
     return render_template("test.html")
 
 @app.route("/products",  methods=["GET", "POST"])
+@login_required
 def products():
     if request.method=="GET":
 
@@ -61,6 +62,7 @@ def products():
         return redirect("/products") 
 
 @app.route("/expenses", methods=["GET", "POST"])
+@login_required
 def expenses():
     if request.method=="GET":
         cur.execute("SELECT * FROM PURCHASES ORDER BY purchase_date DESC")
@@ -80,6 +82,7 @@ def expenses():
    
 
 @app.route("/sales", methods=["GET","POST"])
+@login_required
 def sales():
     if request.method=="GET":
         cur.execute("select sales.id, products.name, sales.quantity, sales.created_at from sales join products on products.id=sales.pid")
@@ -147,6 +150,7 @@ def dashboard():
     return render_template("dashboard.html", x=x, y=y, a=a, b=b, tprofit=tprofit, texpenses=texpenses, todaynetprofit=todaynetprofit)  
 
 @app.route("/update-products", methods=["POST"])
+@login_required
 def update_products():
     id=request.form["id"]
     name = request.form["name"]
@@ -190,7 +194,12 @@ def login():
         email = request.form['email']
         password = request.form['password']
 
+        # hash_password=bcrypt.generate_password_hash(password).decode('utf-8')
+        # is_valid = bcrypt.check_password_hash 
+        #                     (hashed_password, password)
+
         query_login = "SELECT user_id FROM users WHERE email='{}' and password='{}'".format(email,password)
+        # print(f'{hash_password} is the new hashed password')
         cur.execute(query_login)
         user=cur.fetchone()
         if user is None:
