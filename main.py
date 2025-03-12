@@ -80,6 +80,23 @@ def expenses():
         return redirect("/expenses")
 
    
+@app.route("/stock", methods=["GET", "POST"])
+@login_required
+def stock():
+    if request.method=="GET":
+        cur.execute("SELECT stock.stock_id, products.name, stock.quantity, stock.stock_in_date FROM stock join products on products.id=stock.pid")
+        stock=cur.fetchall()
+        cur.execute("SELECT * FROM products ORDER BY name ASC")
+        products=cur.fetchall()
+        return render_template("stock.html", stock=stock, products=products)
+    else:
+        pid=request.form["pid"]
+        quantity=request.form["quantity"]
+        query_update_stock="INSERT INTO stock(quantity, pid,stock_in_date)"\
+                            "VALUES({},{},now())".format(quantity,pid)
+        cur.execute(query_update_stock)
+        conn.commit()
+        return redirect("/stock")
 
 @app.route("/sales", methods=["GET","POST"])
 @login_required
@@ -116,8 +133,8 @@ def dashboard():
     today_query_sales_per_product = "SELECT products.name as product_name, SUM(sales.quantity*products.selling_price) as total_sales FROM sales JOIN products on products.id=sales.pid WHERE cast(created_at as DATE) = CURRENT_DATE GROUP BY products.name"
     # query_profit_per_product = "SELECT products.name as product_name, SUM(sales.quantity*(products.selling_price - products.buying_price )) as total_profit FROM sales JOIN products on products.id=sales.pid GROUP BY products.name"
     today_query_profit_per_product = "SELECT products.name as product_name, SUM(sales.quantity*(products.selling_price - products.buying_price )) as total_profit FROM sales JOIN products on products.id=sales.pid WHERE cast(created_at as DATE) = CURRENT_DATE GROUP BY products.name"
-    query_today_profit= "SELECT SUM(sales.quantity*(products.selling_price - products.buying_price )) as total_profit FROM sales JOIN products on products.id=sales.pid WHERE cast(created_at as DATE) = CURRENT_DATE"
-    query_today_expenses="select sum(amount) from purchases where  cast(purchase_date as DATE) = CURRENT_DATE"
+    query_today_profit= "SELECT COALESCE(SUM(sales.quantity*(products.selling_price - products.buying_price )),0) as total_profit FROM sales JOIN products on products.id=sales.pid WHERE cast(created_at as DATE) = CURRENT_DATE"
+    query_today_expenses="select COALESCE(sum(amount),0) from purchases where  cast(purchase_date as DATE) = CURRENT_DATE"
 
     cur.execute(query_today_profit)
     todayprofit = cur.fetchone()
@@ -174,17 +191,28 @@ def register():
         email = request.form["email"]
         password = request.form["password"]
 
-        hash_password=bcrypt.generate_password_hash(password).decode('utf-8')
+        query_email_exists = "SELECT user_id FROM users WHERE email='{}'".format(email)
+        cur.execute(query_email_exists)
+        user = cur.fetchone()
 
-        new_user_query ="INSERT INTO users(full_name,email,password)"\
-                        "VALUES('{}', '{}', '{}')".format(fullName,email, hash_password)
-        
-        print(f'{hash_password} is the hashed password')
-        
-        cur.execute(new_user_query)
-        conn.commit()
+        print(f'{user} is the user')        
 
-        return redirect('/login')
+        if user is not None:
+            flash ('Email exists!')
+            return render_template('/register.html')
+        
+        else:
+            hash_password=bcrypt.generate_password_hash(password).decode('utf-8')
+
+            new_user_query ="INSERT INTO users(full_name,email,password)"\
+                            "VALUES('{}', '{}', '{}')".format(fullName,email, hash_password)
+            
+            print(f'{hash_password} is the hashed password')
+            
+            cur.execute(new_user_query)
+            conn.commit()
+
+            return redirect('/login')
     else:
         return render_template('/register.html') 
 
@@ -198,26 +226,26 @@ def login():
         cur.execute(query_email_exists)
         user = cur.fetchone()
 
-        print(f'{user} is the user')
-
-        hashed_pass_query = "SELECT password FROM users WHERE email='{}'".format(email)
-        cur.execute(hashed_pass_query)  
-        hashed_pass = cur.fetchone()[0]
-
-        print(f'{hashed_pass} is the OLD hashed password')
-
-        is_valid = bcrypt.check_password_hash(hashed_pass, password)
-
-        print(f'{is_valid} Boolean')
+        print(f'{user} is the user')        
 
         if user is None:
             flash ('Email does not exist')
             return render_template('/login.html')
         else:
-            if is_valid:                
+            hashed_pass_query = "SELECT password FROM users WHERE email='{}'".format(email)
+            cur.execute(hashed_pass_query)  
+            hashed_pass = cur.fetchone()[0]
+
+            print(f'{hashed_pass} is the OLD hashed password')
+
+            is_valid = bcrypt.check_password_hash(hashed_pass, password)
+
+            print(f'{is_valid} Boolean')
+            if is_valid:                               
                 session["email"] = email
                 flash ('Log in success')
                 return redirect('/dashboard')
+                # return redirect(request.referrer)
             else:
                 flash ('Invalid credentials')
                 return render_template('/login.html')
@@ -248,6 +276,15 @@ def login():
         #     return render_template('/login.html')
     else:     
      return render_template('/login.html')
+
+@app.route('/logout')
+def logout():
+    session.pop('email', None)
+    return redirect('/')
+
+# def logout():
+#     session.clear()
+#     return redirect("/login")
 
 if __name__ == '__main__':        
     app.run(debug=True)
