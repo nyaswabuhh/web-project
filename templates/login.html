@@ -33,6 +33,8 @@
         <div class="form-container">
             <h2 class="text-center mb-4">Login</h2>
             <form id="loginForm" action="/login" method="post">
+                                
+                <input type="hidden" name="next_url" value="{{next_url}}">
                 <label for="email" class="form-label">Email Address</label>
                 <input type="email" class="form-control" id="email" name="email" required
                     placeholder="Enter your email">

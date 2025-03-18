@@ -17,10 +17,12 @@ app.secret_key = 'ferfe565sdsewgew'
 
 def login_required(f):
     @wraps(f)
-    def protected():
+    def protected(*args, **kwargs):
         if 'email' not in session:
-            return redirect(url_for("login"))
-        return f()
+            flash('You must first log in')
+            next_url = request.url  # Store the requested URL
+            return redirect(url_for('login', next=next_url))  # Pass next_url
+        return f(*args, **kwargs)
     return protected
 
 
@@ -217,65 +219,37 @@ def register():
         return render_template('/register.html') 
 
 @app.route('/login', methods=['GET', 'POST'])
-def login():
+def login():    
+    next_url = request.args.get('next')  # Get next URL if provided
+    print("---------tdtstgssh---", next_url)
     if request.method == "POST":
-        email = request.form['email']
-        password = request.form['password']
-
-        query_email_exists = "SELECT user_id FROM users WHERE email='{}'".format(email)
-        cur.execute(query_email_exists)
-        user = cur.fetchone()
-
-        print(f'{user} is the user')        
-
-        if user is None:
-            flash ('Email does not exist')
-            return render_template('/login.html')
+        email = request.form["email"]
+        password = request.form["password"]
+       
+        cur.execute("select user_id from users where email='{}'".format(email))
+        email_exists = cur.fetchone()
+  
+        if  email_exists is None:            
+            flash('Email does not exist. Please register.')
+            return redirect("/login")
         else:
-            hashed_pass_query = "SELECT password FROM users WHERE email='{}'".format(email)
-            cur.execute(hashed_pass_query)  
-            hashed_pass = cur.fetchone()[0]
-
-            print(f'{hashed_pass} is the OLD hashed password')
-
-            is_valid = bcrypt.check_password_hash(hashed_pass, password)
-
-            print(f'{is_valid} Boolean')
-            if is_valid:                               
-                session["email"] = email
-                flash ('Log in success')
-                return redirect('/dashboard')
-                # return redirect(request.referrer)
+            cur.execute("select password from users where email = '{}'".format(email))
+            saved_hashed = cur.fetchone()[0]
+            pass_bool = bcrypt.check_password_hash(saved_hashed, password)
+            
+            if pass_bool == False:
+                flash("Invalid Credentials")
+                return redirect("/login")
             else:
-                flash ('Invalid credentials')
-                return render_template('/login.html')
-
-
-
-        # hash_password=bcrypt.generate_password_hash(password).decode('utf-8')
-        # is_valid = bcrypt.check_password_hash 
-        #                     (hashed_password, password)
-
-        # query_login = "SELECT user_id FROM users WHERE email='{}' and password='{}'".format(email,password)
-        # print(f'{hash_password} is the new hashed password')
-        # cur.execute(query_login)
-        # user=cur.fetchone()
-        # if user is None:
-        #     flash ('Invalid credentials')
-        #     return render_template('/login.html')      
-        # else:
-        #     session["email"] = email
-        #     print('Log in success')
-        #     return redirect('/dashboard')  
-        # if user:
-        #     session["email"] = email
-        #     flash ('Log in success')
-        #     return redirect('/dashboard')
-        # else:
-        #     flash ('Invalid credentials')
-        #     return render_template('/login.html')
-    else:     
-     return render_template('/login.html')
+                print("-----ssdd--sdd--", request.form["next_url"])
+                next_url = request.form["next_url"]
+                session['email'] =email
+                if next_url == "None":
+                    return redirect("/dashboard")
+                else:
+                    url = "/"+next_url.split('/')[-1]
+                    return redirect(url)
+    return render_template("login.html", next_url=next_url)
 
 @app.route('/logout')
 def logout():
